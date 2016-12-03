@@ -13,7 +13,9 @@ object Api extends ServerApp {
 
   override def server(args: List[String]): Task[Server] = {
     BlazeBuilder
-      .bindHttp(Properties.envOrNone("PORT") map { _.toInt } get, "localhost")
+      .bindHttp(
+        Properties.envOrElse("PORT", "7000").toInt,
+        Properties.envOrElse("HOST", "0.0.0.0"))
       .mountService(service, "/api")
       .start
   }
