@@ -1,3 +1,5 @@
+name := "api"
+
 scalaVersion := "2.11.8"
 
 val scalazVersion = "7.2.7"
