@@ -17,7 +17,7 @@ object Api extends ServerApp with StrictLogging {
       id = Properties.envOrNone("APP_CLIENT_ID").get,
       secret = User.Base64EncodedSecret(Properties.envOrNone("APP_CLIENT_SECRET").get)
     ),
-    databaseUrl = Properties.envOrNone("DATABASE_URL").get
+    databaseUrl = "jdbc:" + Properties.envOrNone("DATABASE_URL").get
   )
 
   val eventStore = new EventStore(config.databaseUrl)
