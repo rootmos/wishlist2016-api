@@ -125,6 +125,6 @@ class WishServiceSpec extends WordSpec with Matchers with MockitoSweetener with 
     eventStore.fetchEvents(user.id) returns Task.point(events)
     eventStore.insertEvent(any[Event]) returns Task.point(())
 
-    val service = WishService.service(eventStore)
+    val service = WishService(eventStore)
   }
 }

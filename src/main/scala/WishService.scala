@@ -11,7 +11,7 @@ import io.circe.optics.JsonPath._
 import scala.math.Ordering
 
 object WishService extends Wish.Encoders {
-  def service(eventStore: EventStore): AuthedService[User] = AuthedService[User] {
+  def apply(eventStore: EventStore): AuthedService[User] = AuthedService[User] {
     case AuthedRequest(u, GET -> Root / "wishlist" ) =>
       eventStore.fetchEvents(u.id) map { _.sortBy(_.time) } map { es =>
         es.foldLeft(Map.empty[Wish.Id, Wish]) {

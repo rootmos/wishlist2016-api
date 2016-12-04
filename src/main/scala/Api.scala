@@ -1,7 +1,6 @@
 import scalaz._, concurrent.Task._, Kleisli._
-import org.http4s._, org.http4s.dsl._
+import org.http4s._
 import scalaz.concurrent.Task
-import org.http4s.AuthedRequest
 import org.http4s.server.{Server, ServerApp, AuthMiddleware, HttpMiddleware}
 import org.http4s.server.blaze._
 import scala.util.{Random, Properties}
@@ -23,13 +22,10 @@ object Api extends ServerApp with StrictLogging {
 
   val eventStore = new EventStore(config.databaseUrl)
 
+  val wishService = WishService(eventStore)
+
   val auth: Kleisli[Task, Request, User] = User.authorize[EitherT[Task, User.Failure, ?]](config.clientSecret) mapT { _.run.map { case \/-(u) => u } }
   val authMiddleware = AuthMiddleware(auth)
-
-  val helloService = AuthedService[User] {
-    case AuthedRequest(u, GET -> Root / "hello" / name) =>
-      Ok(s"Hello, $name.")
-  }
 
   val logging: HttpMiddleware = { service =>
     kleisli { (request: Request) =>
@@ -39,7 +35,7 @@ object Api extends ServerApp with StrictLogging {
     }
   }
 
-  val service = logging(authMiddleware(helloService))
+  val service = logging(authMiddleware(wishService))
 
   override def server(args: List[String]): Task[Server] = {
     BlazeBuilder
