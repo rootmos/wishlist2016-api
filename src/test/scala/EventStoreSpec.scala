@@ -1,6 +1,7 @@
 import scalaz._, syntax.all._
 import org.scalatest._
 import java.time.ZonedDateTime
+import scala.util.Properties
 
 class EventStoreSpec extends WordSpec with Matchers with DataGenerators {
   "EventStore" should {
@@ -32,7 +33,7 @@ class EventStoreSpec extends WordSpec with Matchers with DataGenerators {
   }
 
   trait Fixture {
-    val connectionUrl = "jdbc:postgresql://localhost/wish16?user=pg&password=password"
+    val connectionUrl = Properties.envOrNone("DATABASE_URL").get
     val eventStore = new EventStore(connectionUrl)
   }
 }

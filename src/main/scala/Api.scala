@@ -9,7 +9,7 @@ import com.typesafe.scalalogging.StrictLogging
 
 
 object Api extends ServerApp with StrictLogging {
-  case class Config(port: Int, host: String, clientSecret: User.ClientSecret)
+  case class Config(port: Int, host: String, clientSecret: User.ClientSecret, databaseUrl: String)
 
   val config = Config(
     port = Properties.envOrElse("PORT", "7000").toInt,
@@ -17,8 +17,11 @@ object Api extends ServerApp with StrictLogging {
     clientSecret = User.ClientSecret(
       id = Properties.envOrNone("APP_CLIENT_ID").get,
       secret = User.Base64EncodedSecret(Properties.envOrNone("APP_CLIENT_SECRET").get)
-    )
+    ),
+    databaseUrl = Properties.envOrNone("DATABASE_URL").get
   )
+
+  val eventStore = new EventStore(config.databaseUrl)
 
   val auth: Kleisli[Task, Request, User] = User.authorize[EitherT[Task, User.Failure, ?]](config.clientSecret) mapT { _.run.map { case \/-(u) => u } }
   val authMiddleware = AuthMiddleware(auth)
