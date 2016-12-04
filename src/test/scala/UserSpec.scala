@@ -46,7 +46,7 @@ class UserSpec extends WordSpec with Matchers with DataGenerators {
         val token = JwtCirce.encode(claim, clientSecret.secret, JwtAlgorithm.HS512)
 
         val request = Request(headers = Headers(Header("authorization", s"Bearer $token")))
-        val wrongSecret = clientSecret.copy(secret = User.Base64EncodedSecret(JwtBase64.encodeString("wrong-secret")))
+        val wrongSecret = clientSecret.copy(secret = Base64EncodedSecret(JwtBase64.encodeString("wrong-secret")))
         val result = User.authorize[User.Failure \/ ?](wrongSecret).run(request)
         result should matchPattern { case -\/(User.Unauthorized("invalid token", _)) => }
       }

@@ -1,8 +1,7 @@
 import scalaz._, Kleisli._, syntax.applicative._
 import org.http4s.{Request, OAuth2BearerToken}
 import org.http4s.headers.Authorization
-import pdi.jwt.{JwtCirce, JwtAlgorithm, JwtBase64}
-import javax.crypto.SecretKey
+import pdi.jwt.{JwtCirce, JwtAlgorithm}
 import io.circe._
 
 import scala.util.{Success, Failure}
@@ -22,13 +21,6 @@ object User {
     implicit val userIdDecoder = new Decoder[Id] {
       def apply(c: HCursor) = c.as[String].right map Id
     }
-  }
-
-  case class Base64EncodedSecret(encoded: String) extends SecretKey {
-    val decoded = JwtBase64.decode(encoded)
-    def getAlgorithm(): String = ???
-    def getEncoded(): Array[Byte] = decoded
-    def getFormat(): String = "RAW"
   }
 
   case class ClientSecret(id: String, secret: Base64EncodedSecret)

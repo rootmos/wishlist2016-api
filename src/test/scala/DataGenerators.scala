@@ -5,7 +5,7 @@ trait DataGenerators extends Salt {
   def newUser = User(newUserId)
   def newClientSecret = User.ClientSecret(
     s"client-id-$salt",
-    User.Base64EncodedSecret(JwtBase64.encodeString(s"secret-$salt"))
+    Base64EncodedSecret(JwtBase64.encodeString(s"secret-$salt"))
   )
 
   def newWishId = Wish.Id(s"wish-id-$salt")

@@ -8,21 +8,22 @@ import com.typesafe.scalalogging.StrictLogging
 
 
 object Api extends ServerApp with StrictLogging {
-  case class Config(port: Int, host: String, clientSecret: User.ClientSecret, databaseUrl: String)
+  case class Config(port: Int, host: String, clientSecret: User.ClientSecret, databaseUrl: String, listSecret: Base64EncodedSecret)
 
   val config = Config(
     port = Properties.envOrElse("PORT", "7000").toInt,
     host = Properties.envOrElse("HOST", "0.0.0.0"),
     clientSecret = User.ClientSecret(
       id = Properties.envOrNone("APP_CLIENT_ID").get,
-      secret = User.Base64EncodedSecret(Properties.envOrNone("APP_CLIENT_SECRET").get)
+      secret = Base64EncodedSecret(Properties.envOrNone("APP_CLIENT_SECRET").get)
     ),
-    databaseUrl = Properties.envOrNone("JDBC_DATABASE_URL").get
+    databaseUrl = Properties.envOrNone("JDBC_DATABASE_URL").get,
+    listSecret = Base64EncodedSecret(Properties.envOrNone("APP_LIST_SECRET").get)
   )
 
   val eventStore = new EventStore(config.databaseUrl)
 
-  val wishService = WishService(eventStore)
+  val wishService = WishService(eventStore, config.listSecret)
 
   val auth: Kleisli[Task, Request, User] = User.authorize[EitherT[Task, User.Failure, ?]](config.clientSecret) mapT { _.run.map { case \/-(u) => u } }
   val authMiddleware = AuthMiddleware(auth)
