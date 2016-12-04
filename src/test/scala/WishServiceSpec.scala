@@ -3,13 +3,14 @@ import scalaz._
 import scalaz.concurrent.Task
 import org.scalatest._
 import com.github.jostly.scalatest.mock.MockitoSweetener
+import com.github.jostly.scalatest.mock.mockito.Capturing
 import org.http4s.{Request, Method, AuthedRequest, Status, Uri}
 import org.http4s.circe._
 import io.circe._
 import io.circe.optics.JsonPath._
 import scala.util.Random
 
-class WishServiceSpec extends WordSpec with Matchers with MockitoSweetener with DataGenerators with Inside {
+class WishServiceSpec extends WordSpec with Matchers with MockitoSweetener with DataGenerators with Inside with Capturing {
   "WishService" should {
     "answer with wishes" in new Fixture {
       val wish = newWish(user.id)
@@ -75,6 +76,46 @@ class WishServiceSpec extends WordSpec with Matchers with MockitoSweetener with 
         case Some(xs) => xs shouldBe empty
       }
     }
+
+    "put updated wishes " in new Fixture {
+      val events = Nil
+      val wid = newWishId
+
+      val title = newTitle
+      val request = Request(Method.PUT, Uri(path = s"/wish/${wid.repr}"))
+        .withBody(s"""{"title":"$title"}""")
+        .unsafePerformSync
+
+      val \/-(response) = service(AuthedRequest(user, request)).unsafePerformSyncAttempt
+      response.status shouldBe Status.Ok
+
+      val w = response.as[Json].unsafePerformSync
+      root.id.string.getOption(w) shouldBe Some(wid.repr)
+      root.uid.string.getOption(w) shouldBe Some(user.id.repr)
+      root.title.string.getOption(w) shouldBe Some(title)
+
+      capturing {
+        there was one(eventStore).insertEvent(verified[Event] by {
+          case PutWishEvent(Wish(wid, user.id, title), _) =>
+        })
+      }
+    }
+
+    "delete wishes " in new Fixture {
+      val events = Nil
+      val wid = newWishId
+
+      val request = Request(Method.DELETE, Uri(path = s"/wish/${wid.repr}"))
+
+      val \/-(response) = service(AuthedRequest(user, request)).unsafePerformSyncAttempt
+      response.status shouldBe Status.Accepted
+
+      capturing {
+        there was one(eventStore).insertEvent(verified[Event] by {
+          case ForgetWishEvent(user.id, wid, _) =>
+        })
+      }
+    }
   }
 
   trait Fixture {
@@ -82,6 +123,7 @@ class WishServiceSpec extends WordSpec with Matchers with MockitoSweetener with 
     def events: List[Event]
     val eventStore = mock[EventStore]
     eventStore.fetchEvents(user.id) returns Task.point(events)
+    eventStore.insertEvent(any[Event]) returns Task.point(())
 
     val service = WishService.service(eventStore)
   }
