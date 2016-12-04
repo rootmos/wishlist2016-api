@@ -1,8 +1,7 @@
 import scalaz._, syntax.all._
 import org.scalatest._
 import org.http4s._
-import pdi.jwt.JwtCirce
-import pdi.jwt.JwtAlgorithm
+import pdi.jwt.{JwtCirce, JwtAlgorithm, JwtBase64}
 
 class UserSpec extends WordSpec with Matchers with DataGenerators {
   "User" should {
@@ -47,7 +46,7 @@ class UserSpec extends WordSpec with Matchers with DataGenerators {
         val token = JwtCirce.encode(claim, clientSecret.secret, JwtAlgorithm.HS512)
 
         val request = Request(headers = Headers(Header("authorization", s"Bearer $token")))
-        val wrongSecret = clientSecret.copy(secret = "wrong-secret")
+        val wrongSecret = clientSecret.copy(secret = User.Base64EncodedSecret(JwtBase64.encodeString("wrong-secret")))
         val result = User.authorize[User.Failure \/ ?](wrongSecret).run(request)
         result should matchPattern { case -\/(User.Unauthorized("invalid token", _)) => }
       }

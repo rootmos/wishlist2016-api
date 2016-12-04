@@ -19,7 +19,9 @@ libraryDependencies ++= Seq(
   "io.circe" %% "circe-core" % circeVersion,
   "io.circe" %% "circe-generic" % circeVersion,
   "io.circe" %% "circe-parser" % circeVersion,
-  "io.circe" %% "circe-optics" % circeVersion
+  "io.circe" %% "circe-optics" % circeVersion,
+  "com.typesafe.scala-logging" %% "scala-logging" % "3.5.0",
+  "org.slf4j" % "slf4j-simple" % "1.7.21"
 )
 
 scalacOptions ++= Seq(
