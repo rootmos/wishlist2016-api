@@ -7,10 +7,10 @@ sealed trait Event {
   def time: ZonedDateTime
 }
 
-case class PutWishEvent(time: ZonedDateTime, wish: Wish) extends Event {
+case class PutWishEvent(wish: Wish, time: ZonedDateTime = ZonedDateTime.now) extends Event {
   def userId = wish.uid
 }
-case class ForgetWishEvent(userId: User.Id, time: ZonedDateTime, wishId: Wish.Id) extends Event
+case class ForgetWishEvent(userId: User.Id, wishId: Wish.Id, time: ZonedDateTime = ZonedDateTime.now) extends Event
 
 object Events {
   trait Encoders extends User.Encoders with Wish.Encoders with ZonedDateTimeEncoders {
