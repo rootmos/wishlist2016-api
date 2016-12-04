@@ -23,6 +23,12 @@ class UserSpec extends WordSpec with Matchers with DataGenerators {
         result shouldBe \/-(User(userId))
       }
 
+      "reject request with wrong authorization method" in {
+        val request = Request(headers = Headers(Header("authorization", s"Basic yo")))
+        val result = User.authorize[User.Failure \/ ?](newClientSecret).run(request)
+        result shouldBe User.Unauthorized("wrong authorization method").left
+      }
+
       "reject request with incorrect secret" in {
         val clientSecret = newClientSecret
         val userId = newUserId
@@ -32,6 +38,22 @@ class UserSpec extends WordSpec with Matchers with DataGenerators {
         val request = Request(headers = Headers(Header("authorization", s"Bearer $token")))
         val wrongSecret = clientSecret.copy(secret = "wrong-secret")
         val result = User.authorize[User.Failure \/ ?](wrongSecret).run(request)
+        result should matchPattern { case -\/(User.Unauthorized("invalid token", _)) => }
+      }
+
+      "reject request without sub" in {
+        val clientSecret = newClientSecret
+        val claim = s"""{}"""
+        val token = JwtCirce.encode(claim, clientSecret.secret, JwtAlgorithm.HS512)
+
+        val request = Request(headers = Headers(Header("authorization", s"Bearer $token")))
+        val result = User.authorize[User.Failure \/ ?](clientSecret).run(request)
+        result shouldBe User.Unauthorized("invalid token: missing sub").left
+      }
+
+      "reject request with malformed token" in {
+        val request = Request(headers = Headers(Header("authorization", s"Bearer yo")))
+        val result = User.authorize[User.Failure \/ ?](newClientSecret).run(request)
         result should matchPattern { case -\/(User.Unauthorized("invalid token", _)) => }
       }
     }
