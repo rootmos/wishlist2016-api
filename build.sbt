@@ -21,7 +21,9 @@ libraryDependencies ++= Seq(
   "io.circe" %% "circe-parser" % circeVersion,
   "io.circe" %% "circe-optics" % circeVersion,
   "com.typesafe.scala-logging" %% "scala-logging" % "3.5.0",
-  "org.slf4j" % "slf4j-simple" % "1.7.21"
+  "org.slf4j" % "slf4j-simple" % "1.7.21",
+  "com.typesafe.slick" %% "slick" % "3.1.1",
+  "org.postgresql" % "postgresql" % "9.3-1100-jdbc4"
 )
 
 scalacOptions ++= Seq(
@@ -38,3 +40,5 @@ scalacOptions ++= Seq(
 resolvers += Resolver.sonatypeRepo("releases")
 addCompilerPlugin("org.spire-math" %% "kind-projector" % "0.9.3")
 enablePlugins(JavaAppPackaging)
+
+fork := true

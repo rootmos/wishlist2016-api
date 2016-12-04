@@ -3,6 +3,7 @@ import org.http4s.{Request, OAuth2BearerToken}
 import org.http4s.headers.Authorization
 import pdi.jwt.{JwtCirce, JwtAlgorithm, JwtBase64}
 import javax.crypto.SecretKey
+import io.circe._
 
 import scala.util.{Success, Failure}
 
@@ -10,6 +11,18 @@ case class User(id: User.Id)
 
 object User {
   case class Id(repr: String)
+
+  trait Encoders {
+    implicit val userIdEncoder = new Encoder[Id] {
+      def apply(x: Id): Json = Json.fromString(x.repr)
+    }
+  }
+
+  trait Decoders {
+    implicit val userIdDecoder = new Decoder[Id] {
+      def apply(c: HCursor) = c.as[String].right map Id
+    }
+  }
 
   case class Base64EncodedSecret(encoded: String) extends SecretKey {
     val decoded = JwtBase64.decode(encoded)
