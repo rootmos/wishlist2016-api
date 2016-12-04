@@ -1,4 +1,4 @@
-import java.time.ZonedDateTime
+import java.time.{ZonedDateTime, Instant}
 
 import scalaz._, syntax.bind._
 import scalaz.concurrent.Task
@@ -41,6 +41,10 @@ object WishService extends Wish.Encoders {
           }
         case Failure(f) => Forbidden()
       }
+
+    case AuthedRequest(u, GET -> Root / "wishlist-token") =>
+      val token = JwtCirce.encode(s"""{"sub":"${u.id.repr}","iat":${Instant.now.getEpochSecond}}""", listSecret, JwtAlgorithm.HS256)
+      Ok(s"""{"token":"$token"}""")
   }
 
   implicit val `ZonedDateTime has an Ordering` = new Ordering[ZonedDateTime] {

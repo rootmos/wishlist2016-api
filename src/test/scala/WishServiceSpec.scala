@@ -9,7 +9,8 @@ import org.http4s.circe._
 import io.circe._
 import io.circe.optics.JsonPath._
 import pdi.jwt.{JwtCirce, JwtAlgorithm}
-import scala.util.Random
+
+import scala.util.{Random, Success}
 
 class WishServiceSpec extends WordSpec with Matchers with MockitoSweetener with DataGenerators with Inside with Capturing {
   "WishService" should {
@@ -134,6 +135,23 @@ class WishServiceSpec extends WordSpec with Matchers with MockitoSweetener with 
           root.id.string.getOption(w) shouldBe Some(wish.id.repr)
           root.uid.string.getOption(w) shouldBe Some(user.id.repr)
           root.title.string.getOption(w) shouldBe Some(wish.title)
+      }
+    }
+
+    "fetch wish-list token" in new Fixture {
+      val events = Nil
+
+      val request = Request(Method.GET, Uri(path = s"/wishlist-token"))
+      val \/-(response) = service(AuthedRequest(user, request)).unsafePerformSyncAttempt
+      response.status shouldBe Status.Ok
+
+      val json = response.as[Json].unsafePerformSync
+      inside(root.token.string.getOption(json)) {
+        case Some(token) =>
+          val Success(claim) = JwtCirce.decodeJson(token, listSecret, JwtAlgorithm.allHmac)
+          root.sub.string.getOption(claim) shouldBe Some(user.id.repr)
+          root.iat.int.getOption(claim) should matchPattern { case Some(_) => }
+
       }
     }
   }
