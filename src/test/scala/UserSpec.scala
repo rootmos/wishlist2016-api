@@ -23,6 +23,17 @@ class UserSpec extends WordSpec with Matchers with DataGenerators {
         result shouldBe \/-(User(userId))
       }
 
+      "reject expired token" in {
+        val clientSecret = newClientSecret
+        val userId = newUserId
+        val claim = s"""{"sub":"${userId.repr}","exp":1480773113}"""
+        val token = JwtCirce.encode(claim, clientSecret.secret, JwtAlgorithm.HS512)
+
+        val request = Request(headers = Headers(Header("authorization", s"Bearer $token")))
+        val result = User.authorize[User.Failure \/ ?](clientSecret).run(request)
+        result should matchPattern { case -\/(User.Unauthorized("invalid token", _)) => }
+      }
+
       "reject request with wrong authorization method" in {
         val request = Request(headers = Headers(Header("authorization", s"Basic yo")))
         val result = User.authorize[User.Failure \/ ?](newClientSecret).run(request)
