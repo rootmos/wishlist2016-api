@@ -14,7 +14,7 @@ class UserServiceSpec extends WordSpec with Matchers with MockitoSweetener with 
       val ui = newUserInfo(user.id)
       val events = PutUserInfo(ui) :: Nil
 
-      val request = Request(Method.GET, Uri(path = "/user"))
+      val request = Request(Method.GET)
       val \/-(response) = service(AuthedRequest(user, request)).unsafePerformSyncAttempt
       response.status shouldBe Status.Ok
 
@@ -29,7 +29,7 @@ class UserServiceSpec extends WordSpec with Matchers with MockitoSweetener with 
       val ui = newUserInfo(user.id)
       externalUserInfoFetcher.apply(user) returns Task.point(ui)
 
-      val request = Request(Method.GET, Uri(path = "/user"))
+      val request = Request(Method.GET)
       val \/-(response) = service(AuthedRequest(user, request)).unsafePerformSyncAttempt
       response.status shouldBe Status.Ok
 

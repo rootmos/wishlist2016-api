@@ -16,12 +16,14 @@ class EventStore(val connectionUrl: String) extends EventStoreDB with ScalaFutur
     db.run(events += row).asTask
   } map { _ => () }
 
+
   def fetchEvents(userId: User.Id): Task[List[Event]] =
     db.run(events.filter(_.user_id === userId.repr).map(_.payload).result).asTask map { _.toList } map {
       _ traverseU decode[Event] } map {
         case Right(xs) => xs
         case Left(f) => throw new RuntimeException(s"Unable to load events from database for user $userId: $f")
       }
+
 }
 
 trait EventStoreInstances {

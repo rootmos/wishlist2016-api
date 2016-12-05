@@ -18,7 +18,7 @@ class WishServiceSpec extends WordSpec with Matchers with MockitoSweetener with 
       val wish = newWish(user.id)
       val events = PutWishEvent(wish) :: Nil
 
-      val request = Request(Method.GET, Uri(path = "/wishlist"))
+      val request = Request(Method.GET)
       val \/-(response) = service(AuthedRequest(user, request)).unsafePerformSyncAttempt
       response.status shouldBe Status.Ok
 
@@ -39,7 +39,7 @@ class WishServiceSpec extends WordSpec with Matchers with MockitoSweetener with 
       val updatedWish = origWish.copy(title = newTitle)
       val events = Random.shuffle(PutWishEvent(origWish, t1) :: PutWishEvent(updatedWish, t2) :: Nil)
 
-      val request = Request(Method.GET, Uri(path = "/wishlist"))
+      val request = Request(Method.GET)
       val \/-(response) = service(AuthedRequest(user, request)).unsafePerformSyncAttempt
       response.status shouldBe Status.Ok
 
@@ -56,7 +56,7 @@ class WishServiceSpec extends WordSpec with Matchers with MockitoSweetener with 
       val t2 = t1.plusHours(1)
       val events = Random.shuffle(PutWishEvent(wish, t1) :: ForgetWishEvent(user.id, wish.id, t2) :: Nil)
 
-      val request = Request(Method.GET, Uri(path = "/wishlist"))
+      val request = Request(Method.GET)
       val \/-(response) = service(AuthedRequest(user, request)).unsafePerformSyncAttempt
       response.status shouldBe Status.Ok
 
@@ -69,7 +69,7 @@ class WishServiceSpec extends WordSpec with Matchers with MockitoSweetener with 
     "answer with empty list when no events exist" in new Fixture {
       val events = Nil
 
-      val request = Request(Method.GET, Uri(path = "/wishlist"))
+      val request = Request(Method.GET)
       val \/-(response) = service(AuthedRequest(user, request)).unsafePerformSyncAttempt
       response.status shouldBe Status.Ok
 
@@ -84,7 +84,7 @@ class WishServiceSpec extends WordSpec with Matchers with MockitoSweetener with 
       val wid = newWishId
 
       val title = newTitle
-      val request = Request(Method.PUT, Uri(path = s"/wish/${wid.repr}"))
+      val request = Request(Method.PUT, Uri(path = s"/${wid.repr}"))
         .withBody(s"""{"title":"$title"}""")
         .unsafePerformSync
 
@@ -107,7 +107,7 @@ class WishServiceSpec extends WordSpec with Matchers with MockitoSweetener with 
       val events = Nil
       val wid = newWishId
 
-      val request = Request(Method.DELETE, Uri(path = s"/wish/${wid.repr}"))
+      val request = Request(Method.DELETE, Uri(path = s"/${wid.repr}"))
 
       val \/-(response) = service(AuthedRequest(user, request)).unsafePerformSyncAttempt
       response.status shouldBe Status.Accepted
@@ -124,9 +124,11 @@ class WishServiceSpec extends WordSpec with Matchers with MockitoSweetener with 
       val events = PutWishEvent(wish) :: Nil
 
       val token = JwtCirce.encode(s"""{"sub":"${user.id.repr}"}""", listSecret, JwtAlgorithm.HS256)
-      val request = Request(Method.GET, Uri(path = s"/wishlist/$token"))
+      val request = Request(Method.GET, Uri().withQueryParam("friend", token))
 
-      val \/-(response) = service(AuthedRequest(user, request)).unsafePerformSyncAttempt
+      val otherUser = newUser
+      eventStore.fetchEvents(otherUser.id) returns Task.point(Nil)
+      val \/-(response) = service(AuthedRequest(otherUser, request)).unsafePerformSyncAttempt
       response.status shouldBe Status.Ok
 
       val json = response.as[Json].unsafePerformSync

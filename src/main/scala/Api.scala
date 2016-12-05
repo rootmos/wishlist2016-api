@@ -8,7 +8,13 @@ import com.typesafe.scalalogging.StrictLogging
 
 
 object Api extends ServerApp with StrictLogging {
-  case class Config(port: Int, host: String, clientSecret: User.ClientSecret, databaseUrl: String, listSecret: Base64EncodedSecret)
+  case class Config(
+    port: Int,
+    host: String,
+    clientSecret: User.ClientSecret,
+    auth0Domain: String,
+    databaseUrl: String,
+    listSecret: Base64EncodedSecret)
 
   val config = Config(
     port = Properties.envOrElse("PORT", "7000").toInt,
@@ -17,12 +23,16 @@ object Api extends ServerApp with StrictLogging {
       id = Properties.envOrNone("APP_CLIENT_ID").get,
       secret = Base64EncodedSecret(Properties.envOrNone("APP_CLIENT_SECRET").get)
     ),
+    auth0Domain = Properties.envOrNone("APP_AUTH0_DOMAIN").get,
     databaseUrl = Properties.envOrNone("JDBC_DATABASE_URL").get,
     listSecret = Base64EncodedSecret(Properties.envOrNone("APP_LIST_SECRET").get)
   )
 
   val eventStore = new EventStore(config.databaseUrl)
 
+  val auth0Client = Auth0Client(config.auth0Domain) | (throw new RuntimeException("Cannot construct an Auth0Client!"))
+
+  val userService = UserService(eventStore, auth0Client.fetchUserInfo)
   val wishService = WishService(eventStore, config.listSecret)
 
   val auth: Kleisli[Task, Request, User] = User.authorize[EitherT[Task, User.Failure, ?]](config.clientSecret) mapT { _.run.map { case \/-(u) => u } }
@@ -36,12 +46,11 @@ object Api extends ServerApp with StrictLogging {
     }
   }
 
-  val service = logging(authMiddleware(wishService))
-
   override def server(args: List[String]): Task[Server] = {
     BlazeBuilder
       .bindHttp(config.port, config.host)
-      .mountService(service, "/api")
+      .mountService(logging(authMiddleware(wishService)), "/api/wish")
+      .mountService(logging(authMiddleware(userService)), "/api/user")
       .start
   }
 }

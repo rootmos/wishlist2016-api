@@ -15,10 +15,20 @@ import scala.util.{Success, Failure}
 
 object WishService extends Wish.Encoders with EventStoreInstances {
   def apply(eventStore: EventStore, listSecret: Base64EncodedSecret): AuthedService[User] = AuthedService[User] {
-    case AuthedRequest(u, GET -> Root / "wishlist" ) =>
+    case AuthedRequest(u, GET -> Root :? FriedToken(token)) =>
+      JwtCirce.decodeJson(token, listSecret, JwtAlgorithm.allHmac) match {
+        case Success(json) =>
+          json.hcursor.downField("sub").as[String] match {
+            case Right(sub) => fetchWishlist(eventStore, User.Id(sub))
+            case Left(f) => Forbidden()
+          }
+        case Failure(f) => Forbidden()
+      }
+
+    case AuthedRequest(u, GET -> Root) =>
       fetchWishlist(eventStore, u.id)
 
-    case AuthedRequest(u, req @ PUT -> Root / "wish" / wid) =>
+    case AuthedRequest(u, req @ PUT -> Root / wid) =>
       req.as[Json] flatMap { w =>
         root.title.string.getOption(w) match {
           case Some(title) =>
@@ -28,18 +38,8 @@ object WishService extends Wish.Encoders with EventStoreInstances {
         }
       }
 
-    case AuthedRequest(u, DELETE -> Root / "wish" / wid) =>
+    case AuthedRequest(u, DELETE -> Root / wid) =>
       (eventStore += ForgetWishEvent(u.id, Wish.Id(wid))) >> Accepted()
-
-    case AuthedRequest(u, GET -> Root / "wishlist" / token) =>
-      JwtCirce.decodeJson(token, listSecret, JwtAlgorithm.allHmac) match {
-        case Success(json) =>
-          json.hcursor.downField("sub").as[String] match {
-            case Right(sub) => fetchWishlist(eventStore, User.Id(sub))
-            case Left(f) => Forbidden()
-          }
-        case Failure(f) => Forbidden()
-      }
 
     case AuthedRequest(u, GET -> Root / "wishlist-token") =>
       val token = JwtCirce.encode(s"""{"sub":"${u.id.repr}","iat":${Instant.now.getEpochSecond}}""", listSecret, JwtAlgorithm.HS256)
@@ -51,4 +51,7 @@ object WishService extends Wish.Encoders with EventStoreInstances {
       case (acc, PutWishEvent(w, _)) => acc + (w.id -> w)
       case (acc, ForgetWishEvent(_, wid, _)) => acc - wid
     } map { _.values.asJson.noSpaces } >>= Ok[String]
+
+
+  object FriedToken extends QueryParamDecoderMatcher[String]("friend")
 }

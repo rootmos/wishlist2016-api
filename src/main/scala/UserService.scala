@@ -6,7 +6,7 @@ import io.circe.syntax._
 
 object UserService extends User.Encoders with EventStoreInstances {
   def apply(eventStore: EventStore, externalUserInfoFetcher: User => Task[UserInfo]): AuthedService[User] = AuthedService {
-    case AuthedRequest(u, GET -> Root / "user") => fetchUserInfo(eventStore, u.id) >>= {
+    case AuthedRequest(u, GET -> Root) => fetchUserInfo(eventStore, u.id) >>= {
       case Some(ui) => Task { ui.asJson.noSpaces } >>= Ok[String]
       case None =>
         for {
