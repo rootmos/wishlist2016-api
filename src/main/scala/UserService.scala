@@ -11,7 +11,7 @@ object UserService extends User.Encoders with EventStoreInstances {
       case None =>
         for {
           ui <- externalUserInfoFetcher(u)
-          _ <- eventStore.insertEvent(PutUserInfo(ui))
+          _ <- eventStore += PutUserInfo(ui)
           resp <- Task { ui.asJson.noSpaces } >>= Ok[String]
         } yield resp
     }

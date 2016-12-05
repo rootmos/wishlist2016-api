@@ -34,6 +34,11 @@ trait EventStoreInstances {
       }
   }
 
+  implicit class `EventStore has fancy syntax`(eventStore: EventStore) {
+    val apply = eventStore.fetchEvents _
+    val += = eventStore.insertEvent _
+  }
+
   private def untuple[A, B, C](f: ((A, B)) => C): (A, B) => C = {
     case (a, b) => f((a,b))
   }

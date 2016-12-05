@@ -23,13 +23,13 @@ object WishService extends Wish.Encoders with EventStoreInstances {
         root.title.string.getOption(w) match {
           case Some(title) =>
             val wish = Wish(Wish.Id(wid), u.id, title)
-            eventStore.insertEvent(PutWishEvent(wish)) >> Task { wish.asJson.noSpaces } >>= Ok[String]
+            (eventStore += PutWishEvent(wish)) >> Task { wish.asJson.noSpaces } >>= Ok[String]
           case None => BadRequest()
         }
       }
 
     case AuthedRequest(u, DELETE -> Root / "wish" / wid) =>
-      eventStore.insertEvent(ForgetWishEvent(u.id, Wish.Id(wid))) >> Accepted()
+      (eventStore += ForgetWishEvent(u.id, Wish.Id(wid))) >> Accepted()
 
     case AuthedRequest(u, GET -> Root / "wishlist" / token) =>
       JwtCirce.decodeJson(token, listSecret, JwtAlgorithm.allHmac) match {
