@@ -32,7 +32,7 @@ class EventStoreSpec extends WordSpec with Matchers with DataGenerators {
   }
 
   trait Fixture {
-    val connectionUrl = Properties.envOrNone("DATABASE_URL").get
+    val connectionUrl = Properties.envOrNone("JDBC_DATABASE_URL").get
     val eventStore = new EventStore(connectionUrl)
   }
 }
