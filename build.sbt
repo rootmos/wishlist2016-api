@@ -3,10 +3,9 @@ name := "api"
 scalaVersion := "2.11.8"
 
 val scalazVersion = "7.2.7"
-val http4sVersion = "0.15.0a-SNAPSHOT"
+val http4sVersion = "0.15.0a"
 val circeVersion = "0.6.1"
 
-resolvers += Resolver.sonatypeRepo("snapshots")
 resolvers += Resolver.jcenterRepo
 
 libraryDependencies ++= Seq(

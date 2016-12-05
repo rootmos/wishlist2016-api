@@ -1,4 +1,4 @@
-import java.time.{ZonedDateTime, Instant}
+import java.time.Instant
 
 import scalaz._, syntax.bind._
 import scalaz.concurrent.Task
@@ -11,10 +11,9 @@ import io.circe.syntax._
 import io.circe.optics.JsonPath._
 import pdi.jwt.{JwtCirce, JwtAlgorithm}
 
-import scala.math.Ordering
 import scala.util.{Success, Failure}
 
-object WishService extends Wish.Encoders {
+object WishService extends Wish.Encoders with EventStoreInstances {
   def apply(eventStore: EventStore, listSecret: Base64EncodedSecret): AuthedService[User] = AuthedService[User] {
     case AuthedRequest(u, GET -> Root / "wishlist" ) =>
       fetchWishlist(eventStore, u.id)
@@ -47,15 +46,9 @@ object WishService extends Wish.Encoders {
       Ok(s"""{"token":"$token"}""")
   }
 
-  implicit val `ZonedDateTime has an Ordering` = new Ordering[ZonedDateTime] {
-    def compare(x: ZonedDateTime, y: ZonedDateTime): Int = x compareTo y
-  }
-
   private def fetchWishlist(eventStore: EventStore, uid: User.Id) =
-    eventStore.fetchEvents(uid) map { _.sortBy(_.time) } map { es =>
-      es.foldLeft(Map.empty[Wish.Id, Wish]) {
-        case (acc, PutWishEvent(w, _)) => acc + (w.id -> w)
-        case (acc, ForgetWishEvent(_, wid, _)) => acc - wid
-      }
+    eventStore.fold(uid, Map.empty[Wish.Id, Wish]) {
+      case (acc, PutWishEvent(w, _)) => acc + (w.id -> w)
+      case (acc, ForgetWishEvent(_, wid, _)) => acc - wid
     } map { _.values.asJson.noSpaces } >>= Ok[String]
 }

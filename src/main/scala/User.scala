@@ -3,10 +3,13 @@ import org.http4s.{Request, OAuth2BearerToken}
 import org.http4s.headers.Authorization
 import pdi.jwt.{JwtCirce, JwtAlgorithm}
 import io.circe._
+import io.circe.generic.semiauto._
 
 import scala.util.{Success, Failure}
 
 case class User(id: User.Id)
+
+case class UserInfo(id: User.Id, name: String)
 
 object User {
   case class Id(repr: String)
@@ -15,12 +18,16 @@ object User {
     implicit val userIdEncoder = new Encoder[Id] {
       def apply(x: Id): Json = Json.fromString(x.repr)
     }
+
+    implicit val userInfoEncoder: Encoder[UserInfo] = deriveEncoder[UserInfo]
   }
 
   trait Decoders {
     implicit val userIdDecoder = new Decoder[Id] {
       def apply(c: HCursor) = c.as[String].right map Id
     }
+
+    implicit val userInfoDecoder: Decoder[UserInfo] = deriveDecoder[UserInfo]
   }
 
   case class ClientSecret(id: String, secret: Base64EncodedSecret)

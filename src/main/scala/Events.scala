@@ -12,6 +12,10 @@ case class PutWishEvent(wish: Wish, time: ZonedDateTime = ZonedDateTime.now) ext
 }
 case class ForgetWishEvent(userId: User.Id, wishId: Wish.Id, time: ZonedDateTime = ZonedDateTime.now) extends Event
 
+case class PutUserInfo(userInfo: UserInfo, time: ZonedDateTime = ZonedDateTime.now) extends Event {
+  def userId = userInfo.id
+}
+
 object Events {
   trait Encoders extends User.Encoders with Wish.Encoders with ZonedDateTimeEncoders {
     implicit val eventEncoder: Encoder[Event] = deriveEncoder[Event]

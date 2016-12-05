@@ -11,4 +11,7 @@ trait DataGenerators extends Salt {
   def newWishId = Wish.Id(s"wish-id-$salt")
   def newTitle = s"title-$salt"
   def newWish(uid: User.Id) = Wish(newWishId, uid, title = newTitle)
+
+  def newName = s"title-$salt"
+  def newUserInfo(uid: User.Id) = UserInfo(uid, name = newName)
 }

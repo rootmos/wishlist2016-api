@@ -24,6 +24,21 @@ class EventStore(val connectionUrl: String) extends EventStoreDB with ScalaFutur
       }
 }
 
+trait EventStoreInstances {
+  implicit class `EventStore has a fold method`(eventStore: EventStore) {
+    import ZonedDateTimeOrdering._
+    def fold[B](uid: User.Id, init: B)(f: PartialFunction[(B, Event), B]): Task[B] =
+      eventStore.fetchEvents(uid) map { _.sortBy(_.time) } map { es =>
+        val i: PartialFunction[(B, Event), B] = { case (acc, _) => acc }
+        es.foldLeft(init)(untuple(f orElse i))
+      }
+  }
+
+  private def untuple[A, B, C](f: ((A, B)) => C): (A, B) => C = {
+    case (a, b) => f((a,b))
+  }
+}
+
 trait EventStoreDB {
 
   def connectionUrl: String
