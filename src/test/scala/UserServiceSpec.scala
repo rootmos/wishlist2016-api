@@ -3,6 +3,9 @@ import scalaz.concurrent.Task
 import org.scalatest._
 import com.github.jostly.scalatest.mock.MockitoSweetener
 import com.github.jostly.scalatest.mock.mockito.Capturing
+import io.circe._
+import org.http4s.circe._
+import io.circe.optics.JsonPath._
 import org.http4s.{Request, Method, AuthedRequest, Status, Uri}
 
 class UserServiceSpec extends WordSpec with Matchers with MockitoSweetener with DataGenerators with Inside with Capturing {
@@ -14,6 +17,10 @@ class UserServiceSpec extends WordSpec with Matchers with MockitoSweetener with 
       val request = Request(Method.GET, Uri(path = "/user"))
       val \/-(response) = service(AuthedRequest(user, request)).unsafePerformSyncAttempt
       response.status shouldBe Status.Ok
+
+      val json = response.as[Json].unsafePerformSync
+      root.id.string.getOption(json) shouldBe Some(user.id.repr)
+      root.name.string.getOption(json) shouldBe Some(ui.name)
     }
 
     "answer no content when no user info exist" in new Fixture {
