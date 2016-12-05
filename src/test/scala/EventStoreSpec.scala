@@ -27,6 +27,7 @@ class EventStoreSpec extends WordSpec with Matchers with DataGenerators {
 
       eventStore.fetchEvents(uid).unsafePerformSyncAttempt should matchPattern {
         case \/-(PutWishEvent(e1.wish, _) :: ForgetWishEvent(uid, wid, _) :: Nil) =>
+        case \/-(ForgetWishEvent(uid, wid, _) :: PutWishEvent(e1.wish, _) :: Nil) =>
       }
     }
   }
