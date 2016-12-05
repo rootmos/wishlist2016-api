@@ -1,5 +1,3 @@
-import java.time.Instant
-
 import scalaz._, syntax.bind._
 import scalaz.concurrent.Task
 import scalaz.concurrent.Task._
@@ -9,20 +7,13 @@ import org.http4s.circe._
 import io.circe._
 import io.circe.syntax._
 import io.circe.optics.JsonPath._
-import pdi.jwt.{JwtCirce, JwtAlgorithm}
-
-import scala.util.{Success, Failure}
 
 object WishService extends Wish.Encoders with EventStoreInstances {
   def apply(eventStore: EventStore, listSecret: Base64EncodedSecret): AuthedService[User] = AuthedService[User] {
-    case AuthedRequest(u, GET -> Root :? FriedToken(token)) =>
-      JwtCirce.decodeJson(token, listSecret, JwtAlgorithm.allHmac) match {
-        case Success(json) =>
-          json.hcursor.downField("sub").as[String] match {
-            case Right(sub) => fetchWishlist(eventStore, User.Id(sub))
-            case Left(f) => Forbidden()
-          }
-        case Failure(f) => Forbidden()
+    case AuthedRequest(u, GET -> Root :? FriendToken(token)) =>
+      FriendToken.validate(token, listSecret) match {
+        case \/-(uid) => fetchWishlist(eventStore, uid)
+        case -\/(_) => Forbidden()
       }
 
     case AuthedRequest(u, GET -> Root) =>
@@ -42,7 +33,7 @@ object WishService extends Wish.Encoders with EventStoreInstances {
       (eventStore += ForgetWishEvent(u.id, Wish.Id(wid))) >> Accepted()
 
     case AuthedRequest(u, GET -> Root / "wishlist-token") =>
-      val token = JwtCirce.encode(s"""{"sub":"${u.id.repr}","iat":${Instant.now.getEpochSecond}}""", listSecret, JwtAlgorithm.HS256)
+      val token = FriendToken.issue(u.id, listSecret)
       Ok(s"""{"token":"$token"}""")
   }
 
@@ -51,7 +42,4 @@ object WishService extends Wish.Encoders with EventStoreInstances {
       case (acc, PutWishEvent(w, _)) => acc + (w.id -> w)
       case (acc, ForgetWishEvent(_, wid, _)) => acc - wid
     } map { _.values.asJson.noSpaces } >>= Ok[String]
-
-
-  object FriedToken extends QueryParamDecoderMatcher[String]("friend")
 }

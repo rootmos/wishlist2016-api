@@ -15,4 +15,6 @@ trait DataGenerators extends Salt {
 
   def newName = s"title-$salt"
   def newUserInfo(uid: User.Id) = UserInfo(uid, name = newName)
+
+  def newFollowId = Follow.Id(s"follow-id-$salt")
 }

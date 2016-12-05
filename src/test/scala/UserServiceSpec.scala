@@ -1,4 +1,6 @@
-import scalaz._
+import java.time.ZonedDateTime
+
+import scalaz._, syntax.either._
 import scalaz.concurrent.Task
 import org.scalatest._
 import com.github.jostly.scalatest.mock.MockitoSweetener
@@ -8,6 +10,8 @@ import org.http4s.circe._
 import io.circe.optics.JsonPath._
 import org.http4s.{Request, Method, AuthedRequest, Status, Uri}
 import pdi.jwt.{JwtCirce, JwtAlgorithm}
+
+import scala.util.Random
 
 class UserServiceSpec extends WordSpec with Matchers with MockitoSweetener with DataGenerators with Inside with Capturing {
   "UserService" should {
@@ -100,6 +104,98 @@ class UserServiceSpec extends WordSpec with Matchers with MockitoSweetener with 
       verifyZeroInteractions(externalUserInfoFetcher)
       verifyZeroInteractions(eventStore)
     }
+
+    "answer with list of friend tokens" in new Fixture {
+      val followedUser = newUser
+      val followId = newFollowId
+      val events = FollowEvent(user.id, followId, followedUser.id) :: Nil
+
+      val request = Request(Method.GET, Uri(path = "/follows"))
+      val \/-(response) = service(AuthedRequest(user, request)).unsafePerformSyncAttempt
+      response.status shouldBe Status.Ok
+
+      val json = response.as[Json].unsafePerformSync
+      inside(root.arr.getOption(json)) {
+        case Some(f :: Nil) =>
+          root.id.string.getOption(f) shouldBe Some(followId.repr)
+          val Some(token) = root.token.string.getOption(f)
+          FriendToken.validate(token, friendSecret) shouldBe followedUser.id.right
+      }
+    }
+
+    "answer with empty list of follows" in new Fixture {
+      val events = Nil
+
+      val request = Request(Method.GET, Uri(path = "/follows"))
+      val \/-(response) = service(AuthedRequest(user, request)).unsafePerformSyncAttempt
+      response.status shouldBe Status.Ok
+
+      val json = response.as[Json].unsafePerformSync
+      root.arr.getOption(json) should matchPattern { case Some(Nil) => }
+    }
+
+    "add follow given friend token" in new Fixture {
+      val events = Nil
+
+      val followedUserId = newUserId
+      val followId = newFollowId
+      val request = Request(Method.PUT, Uri(path = s"/follows/$followId"))
+        .withBody(s"""{"token":"${FriendToken.issue(followedUserId, friendSecret)}"}""")
+        .unsafePerformSync
+      val \/-(response) = service(AuthedRequest(user, request)).unsafePerformSyncAttempt
+      response.status shouldBe Status.Accepted
+
+      capturing {
+        there was one(eventStore).insertEvent(verified[Event] by {
+          case FollowEvent(user.id, followId, followedUserId, _) =>
+        })
+      }
+    }
+
+    "reject adding follow given invalid friend token" in new Fixture {
+      val events = Nil
+
+      val followedUserId = newUserId
+      val followId = newFollowId
+      val wrongSecret = Base64EncodedSecret("wrong-secret")
+      val request = Request(Method.PUT, Uri(path = s"/follows/$followId"))
+        .withBody(s"""{"token":"${FriendToken.issue(followedUserId, wrongSecret)}"}""")
+        .unsafePerformSync
+      val \/-(response) = service(AuthedRequest(user, request)).unsafePerformSyncAttempt
+      response.status shouldBe Status.Forbidden
+
+      verifyZeroInteractions(eventStore)
+    }
+
+    "delete follow" in new Fixture {
+      val events = Nil
+
+      val followId = newFollowId
+      val request = Request(Method.DELETE, Uri(path = s"/follows/$followId"))
+      val \/-(response) = service(AuthedRequest(user, request)).unsafePerformSyncAttempt
+      response.status shouldBe Status.Accepted
+
+      capturing {
+        there was one(eventStore).insertEvent(verified[Event] by {
+          case UnfollowEvent(user.id, followId, _) =>
+        })
+      }
+    }
+
+    "answer with empty list when follow was deleted" in new Fixture {
+      val followedUser = newUser
+      val followId = newFollowId
+      val t1 = ZonedDateTime.now
+      val t2 = t1.plusHours(1)
+      val events = Random.shuffle(FollowEvent(user.id, followId, followedUser.id, t1) :: UnfollowEvent(user.id, followId, t2) :: Nil)
+
+      val request = Request(Method.GET, Uri(path = "/follows"))
+      val \/-(response) = service(AuthedRequest(user, request)).unsafePerformSyncAttempt
+      response.status shouldBe Status.Ok
+
+      val json = response.as[Json].unsafePerformSync
+      root.arr.getOption(json) should matchPattern { case Some(Nil) => }
+    }
   }
 
   trait Fixture {
@@ -113,4 +209,5 @@ class UserServiceSpec extends WordSpec with Matchers with MockitoSweetener with 
 
     val service = UserService(eventStore, externalUserInfoFetcher, friendSecret)
   }
+
 }

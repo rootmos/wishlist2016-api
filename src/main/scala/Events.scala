@@ -16,12 +16,16 @@ case class PutUserInfo(userInfo: UserInfo, time: ZonedDateTime = ZonedDateTime.n
   def userId = userInfo.id
 }
 
+case class FollowEvent(userId: User.Id, followId: Follow.Id, followsUser: User.Id, time: ZonedDateTime = ZonedDateTime.now) extends Event
+
+case class UnfollowEvent(userId: User.Id, followId: Follow.Id, time: ZonedDateTime = ZonedDateTime.now) extends Event
+
 object Events {
-  trait Encoders extends User.Encoders with Wish.Encoders with ZonedDateTimeEncoders {
+  trait Encoders extends User.Encoders with Wish.Encoders with Follow.Encoders with ZonedDateTimeEncoders {
     implicit val eventEncoder: Encoder[Event] = deriveEncoder[Event]
   }
 
-  trait Decoders extends User.Decoders with Wish.Decoders with ZonedDateTimeDecoders {
+  trait Decoders extends User.Decoders with Wish.Decoders with Follow.Decoders with ZonedDateTimeDecoders {
     implicit val eventDecoder: Decoder[Event] = deriveDecoder[Event]
   }
 }
