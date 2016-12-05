@@ -126,9 +126,7 @@ class WishServiceSpec extends WordSpec with Matchers with MockitoSweetener with 
       val token = JwtCirce.encode(s"""{"sub":"${user.id.repr}"}""", listSecret, JwtAlgorithm.HS256)
       val request = Request(Method.GET, Uri().withQueryParam("friend", token))
 
-      val otherUser = newUser
-      eventStore.fetchEvents(otherUser.id) returns Task.point(Nil)
-      val \/-(response) = service(AuthedRequest(otherUser, request)).unsafePerformSyncAttempt
+      val \/-(response) = service(AuthedRequest(newUser, request)).unsafePerformSyncAttempt
       response.status shouldBe Status.Ok
 
       val json = response.as[Json].unsafePerformSync
@@ -138,6 +136,31 @@ class WishServiceSpec extends WordSpec with Matchers with MockitoSweetener with 
           root.uid.string.getOption(w) shouldBe Some(user.id.repr)
           root.title.string.getOption(w) shouldBe Some(wish.title)
       }
+    }
+
+    "reject fetching other's wishes with invalid token" in new Fixture {
+      val events = Nil
+
+      val wrongSecret = Base64EncodedSecret("wrong-secret")
+      val token = JwtCirce.encode(s"""{"sub":"${user.id.repr}"}""", wrongSecret, JwtAlgorithm.HS256)
+      val request = Request(Method.GET, Uri().withQueryParam("friend", token))
+
+      val \/-(response) = service(AuthedRequest(newUser, request)).unsafePerformSyncAttempt
+      response.status shouldBe Status.Forbidden
+
+      verifyZeroInteractions(eventStore)
+    }
+
+    "reject fetching other's wishes with incomplete token" in new Fixture {
+      val events = Nil
+
+      val token = JwtCirce.encode(s"""{}""", listSecret, JwtAlgorithm.HS256)
+      val request = Request(Method.GET, Uri().withQueryParam("friend", token))
+
+      val \/-(response) = service(AuthedRequest(newUser, request)).unsafePerformSyncAttempt
+      response.status shouldBe Status.Forbidden
+
+      verifyZeroInteractions(eventStore)
     }
 
     "fetch wish-list token" in new Fixture {
