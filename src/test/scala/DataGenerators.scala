@@ -2,7 +2,8 @@ import pdi.jwt.JwtBase64
 
 trait DataGenerators extends Salt {
   def newUserId = User.Id(s"user-id-$salt")
-  def newUser = User(newUserId)
+  def newAuthToken = User.AuthToken(s"token-$salt")
+  def newUser = User(newUserId, newAuthToken)
   def newClientSecret = User.ClientSecret(
     s"client-id-$salt",
     Base64EncodedSecret(JwtBase64.encodeString(s"secret-$salt"))

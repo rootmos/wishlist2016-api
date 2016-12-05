@@ -19,7 +19,7 @@ class UserSpec extends WordSpec with Matchers with DataGenerators {
 
         val request = Request(headers = Headers(Header("authorization", s"Bearer $token")))
         val result = User.authorize[User.Failure \/ ?](clientSecret).run(request)
-        result shouldBe \/-(User(userId))
+        result shouldBe \/-(User(userId, User.AuthToken(token)))
       }
 
       "reject expired token" in {

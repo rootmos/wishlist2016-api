@@ -5,10 +5,15 @@ import org.http4s.dsl._
 import io.circe.syntax._
 
 object UserService extends User.Encoders with EventStoreInstances {
-  def apply(eventStore: EventStore): AuthedService[User] = AuthedService {
+  def apply(eventStore: EventStore, externalUserInfoFetcher: User => Task[UserInfo]): AuthedService[User] = AuthedService {
     case AuthedRequest(u, GET -> Root / "user") => fetchUserInfo(eventStore, u.id) >>= {
       case Some(ui) => Task { ui.asJson.noSpaces } >>= Ok[String]
-      case None => NoContent()
+      case None =>
+        for {
+          ui <- externalUserInfoFetcher(u)
+          _ <- eventStore.insertEvent(PutUserInfo(ui))
+          resp <- Task { ui.asJson.noSpaces } >>= Ok[String]
+        } yield resp
     }
   }
 

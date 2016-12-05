@@ -23,12 +23,25 @@ class UserServiceSpec extends WordSpec with Matchers with MockitoSweetener with 
       root.name.string.getOption(json) shouldBe Some(ui.name)
     }
 
-    "answer no content when no user info exist" in new Fixture {
+    "fetch user info using the external service" in new Fixture {
       val events = Nil
+
+      val ui = newUserInfo(user.id)
+      externalUserInfoFetcher.apply(user) returns Task.point(ui)
 
       val request = Request(Method.GET, Uri(path = "/user"))
       val \/-(response) = service(AuthedRequest(user, request)).unsafePerformSyncAttempt
-      response.status shouldBe Status.NoContent
+      response.status shouldBe Status.Ok
+
+      val json = response.as[Json].unsafePerformSync
+      root.id.string.getOption(json) shouldBe Some(user.id.repr)
+      root.name.string.getOption(json) shouldBe Some(ui.name)
+
+      capturing {
+        there was one(eventStore).insertEvent(verified[Event] by {
+          case PutUserInfo(ui, _) =>
+        })
+      }
     }
 
     "fetch other users info given correct token" in {
@@ -40,9 +53,10 @@ class UserServiceSpec extends WordSpec with Matchers with MockitoSweetener with 
     val user = newUser
     def events: List[Event]
     val eventStore = mock[EventStore]
+    val externalUserInfoFetcher = mock[User => Task[UserInfo]]
     eventStore.fetchEvents(user.id) returns Task.point(events)
     eventStore.insertEvent(any[Event]) returns Task.point(())
 
-    val service = UserService(eventStore)
+    val service = UserService(eventStore, externalUserInfoFetcher)
   }
 }

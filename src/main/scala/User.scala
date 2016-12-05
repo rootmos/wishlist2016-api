@@ -7,12 +7,13 @@ import io.circe.generic.semiauto._
 
 import scala.util.{Success, Failure}
 
-case class User(id: User.Id)
+case class User(id: User.Id, authToken: User.AuthToken)
 
 case class UserInfo(id: User.Id, name: String)
 
 object User {
   case class Id(repr: String)
+  case class AuthToken(repr: String)
 
   trait Encoders {
     implicit val userIdEncoder = new Encoder[Id] {
@@ -40,7 +41,7 @@ object User {
             JwtCirce.decodeJson(t.token, clientSecret.secret, JwtAlgorithm.allHmac) match {
               case Success(json) =>
                 json.hcursor.downField("sub").as[String] match {
-                  case Right(sub) => User(Id(sub)).point
+                  case Right(sub) => User(Id(sub), AuthToken(t.token)).point
                   case Left(f) => M.raiseError(Unauthorized("invalid token: missing sub"))
                 }
               case Failure(t) =>
