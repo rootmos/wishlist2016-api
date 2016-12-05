@@ -14,7 +14,7 @@ object Api extends ServerApp with StrictLogging {
     clientSecret: User.ClientSecret,
     auth0Domain: String,
     databaseUrl: String,
-    listSecret: Base64EncodedSecret)
+    friendSecret: Base64EncodedSecret)
 
   val config = Config(
     port = Properties.envOrElse("PORT", "7000").toInt,
@@ -25,15 +25,15 @@ object Api extends ServerApp with StrictLogging {
     ),
     auth0Domain = Properties.envOrNone("APP_AUTH0_DOMAIN").get,
     databaseUrl = Properties.envOrNone("JDBC_DATABASE_URL").get,
-    listSecret = Base64EncodedSecret(Properties.envOrNone("APP_LIST_SECRET").get)
+    friendSecret = Base64EncodedSecret(Properties.envOrNone("APP_LIST_SECRET").get)
   )
 
   val eventStore = new EventStore(config.databaseUrl)
 
   val auth0Client = Auth0Client(config.auth0Domain) | (throw new RuntimeException("Cannot construct an Auth0Client!"))
 
-  val userService = UserService(eventStore, auth0Client.fetchUserInfo)
-  val wishService = WishService(eventStore, config.listSecret)
+  val userService = UserService(eventStore, auth0Client.fetchUserInfo, config.friendSecret)
+  val wishService = WishService(eventStore, config.friendSecret)
 
   val auth: Kleisli[Task, Request, User] = User.authorize[EitherT[Task, User.Failure, ?]](config.clientSecret) mapT { _.run.map { case \/-(u) => u } }
   val authMiddleware = AuthMiddleware(auth)
