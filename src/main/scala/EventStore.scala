@@ -31,18 +31,13 @@ trait EventStoreInstances {
     import ZonedDateTimeOrdering._
     def fold[B](uid: User.Id, init: B)(f: PartialFunction[(B, Event), B]): Task[B] =
       eventStore.fetchEvents(uid) map { _.sortBy(_.time) } map { es =>
-        val i: PartialFunction[(B, Event), B] = { case (acc, _) => acc }
-        es.foldLeft(init)(untuple(f orElse i))
+        es.foldLeft(init)(Function.untupled(f orElse { case (acc, _) => acc }))
       }
   }
 
   implicit class `EventStore has fancy syntax`(eventStore: EventStore) {
     val apply = eventStore.fetchEvents _
     val += = eventStore.insertEvent _
-  }
-
-  private def untuple[A, B, C](f: ((A, B)) => C): (A, B) => C = {
-    case (a, b) => f((a,b))
   }
 }
 
