@@ -20,12 +20,22 @@ case class FollowEvent(userId: User.Id, followId: Follow.Id, followsUser: User.I
 
 case class UnfollowEvent(userId: User.Id, followId: Follow.Id, time: ZonedDateTime = ZonedDateTime.now) extends Event
 
+case class CommentEvent(
+  fromId: User.Id,
+  commentId: Comment.Id,
+  wishId: Wish.Id,
+  wishOwnerId: User.Id,
+  body: String,
+  time: ZonedDateTime = ZonedDateTime.now) extends Event {
+    def userId = wishOwnerId
+  }
+
 object Events {
-  trait Encoders extends User.Encoders with Wish.Encoders with Follow.Encoders with ZonedDateTimeEncoders {
+  trait Encoders extends User.Encoders with Wish.Encoders with Follow.Encoders with ZonedDateTimeEncoders with Comment.Encoders {
     implicit val eventEncoder: Encoder[Event] = deriveEncoder[Event]
   }
 
-  trait Decoders extends User.Decoders with Wish.Decoders with Follow.Decoders with ZonedDateTimeDecoders {
+  trait Decoders extends User.Decoders with Wish.Decoders with Follow.Decoders with ZonedDateTimeDecoders with Comment.Decoders {
     implicit val eventDecoder: Decoder[Event] = deriveDecoder[Event]
   }
 }

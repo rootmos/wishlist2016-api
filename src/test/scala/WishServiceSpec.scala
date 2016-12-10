@@ -5,6 +5,7 @@ import org.scalatest._
 import com.github.jostly.scalatest.mock.MockitoSweetener
 import com.github.jostly.scalatest.mock.mockito.Capturing
 import org.http4s.{Request, Method, AuthedRequest, Status, Uri}
+import org.http4s.headers.Location
 import org.http4s.circe._
 import io.circe._
 import io.circe.optics.JsonPath._
@@ -98,7 +99,7 @@ class WishServiceSpec extends WordSpec with Matchers with MockitoSweetener with 
 
       capturing {
         there was one(eventStore).insertEvent(verified[Event] by {
-          case PutWishEvent(Wish(wid, user.id, title), _) =>
+          case PutWishEvent(Wish(`wid`, user.id, `title`), _) =>
         })
       }
     }
@@ -114,7 +115,7 @@ class WishServiceSpec extends WordSpec with Matchers with MockitoSweetener with 
 
       capturing {
         there was one(eventStore).insertEvent(verified[Event] by {
-          case ForgetWishEvent(user.id, wid, _) =>
+          case ForgetWishEvent(user.id, `wid`, _) =>
         })
       }
     }
@@ -177,6 +178,116 @@ class WishServiceSpec extends WordSpec with Matchers with MockitoSweetener with 
           root.sub.string.getOption(claim) shouldBe Some(user.id.repr)
           root.iat.int.getOption(claim) should matchPattern { case Some(_) => }
 
+      }
+    }
+
+    "add comment to own wish" in new Fixture {
+      val events = Nil
+
+      val wid = newWishId
+      val body = s"body-$salt"
+      val request = Request(Method.POST, Uri(path = s"/${wid.repr}/comment"))
+        .withBody(s"""{"body":"$body"}""")
+        .unsafePerformSync
+
+      val \/-(response) = service(AuthedRequest(user, request)).unsafePerformSyncAttempt
+      response.status shouldBe Status.Created
+
+      val Some(location) = response.headers.get(Location) map { _.value }
+
+      val urlMatcher = """/([^/]+)/comment/([^/]+)""".r
+      val cid = inside(urlMatcher findFirstIn location) {
+        case Some(urlMatcher(w, c)) =>
+          w shouldBe wid.repr
+          Comment.Id(c)
+      }
+
+      capturing {
+        there was one(eventStore).insertEvent(verified[Event] by {
+          case CommentEvent(user.id, `cid`, `wid`, user.id, `body`, _) =>
+        })
+      }
+    }
+
+    "add comment to wish owned by another user" in new Fixture {
+      val events = Nil
+
+      val wid = newWishId
+      val owner = newUserId
+      val token = FriendToken.issue(owner, listSecret)
+      val body = s"body-$salt"
+      val request = Request(Method.POST, Uri(path = s"/${wid.repr}/comment"))
+        .withBody(s"""{"body":"$body", "token":"$token"}""")
+        .unsafePerformSync
+
+      val \/-(response) = service(AuthedRequest(user, request)).unsafePerformSyncAttempt
+      response.status shouldBe Status.Created
+
+      val Some(location) = response.headers.get(Location) map { _.value }
+
+      val urlMatcher = """/([^/]+)/comment/([^/]+)""".r
+      val cid = inside(urlMatcher findFirstIn location) {
+        case Some(urlMatcher(w, c)) =>
+          w shouldBe wid.repr
+          Comment.Id(c)
+      }
+
+      capturing {
+        there was one(eventStore).insertEvent(verified[Event] by {
+          case CommentEvent(user.id, `cid`, `wid`, `owner`, `body`, _) =>
+        })
+      }
+    }
+
+    "fetch comments" in new Fixture {
+      val wid = newWishId
+      val from = newUserId
+      val body = s"body-$salt"
+      val cid = Comment.newId
+      val e1 = CommentEvent(from, cid, wid, user.id, body)
+      val e2 = CommentEvent(newUserId, Comment.newId, newWishId, user.id, s"other-body-$salt")
+      val events = Random.shuffle(e1 :: e2 :: Nil)
+
+      val request = Request(Method.GET, Uri(path = s"/${wid.repr}/comments"))
+
+      val \/-(response) = service(AuthedRequest(user, request)).unsafePerformSyncAttempt
+      response.status shouldBe Status.Ok
+
+      val json = response.as[Json].unsafePerformSync
+      inside(root.arr.getOption(json)) {
+        case Some(c :: Nil) =>
+          root.cid.string.getOption(c) shouldBe Some(cid.repr)
+          root.from.string.getOption(c) shouldBe Some(from.repr)
+          root.wid.string.getOption(c) shouldBe Some(wid.repr)
+          root.owner.string.getOption(c) shouldBe Some(user.id.repr)
+          root.body.string.getOption(c) shouldBe Some(body)
+          root.time.string.getOption(c) shouldBe a [Some[_]]
+      }
+    }
+
+    "fetch comments using a friend token" in new Fixture {
+      val wid = newWishId
+      val from = newUserId
+      val body = s"body-$salt"
+      val cid = Comment.newId
+      val e1 = CommentEvent(from, cid, wid, user.id, body)
+      val events = e1 :: Nil
+
+      val token = FriendToken.issue(user.id, listSecret)
+      val request = Request(Method.GET, Uri(path = s"/${wid.repr}/comments").withQueryParam("friend", token))
+
+      val \/-(response) = service(AuthedRequest(newUser, request)).unsafePerformSyncAttempt
+      response.status shouldBe Status.Ok
+
+      val json = response.as[Json].unsafePerformSync
+      inside(root.arr.getOption(json)) {
+        case Some(c :: Nil) =>
+          root.cid.string.getOption(c) shouldBe Some(cid.repr)
+          root.from.string.getOption(c) shouldBe Some(from.repr)
+          root.wid.string.getOption(c) shouldBe Some(wid.repr)
+          root.owner.string.getOption(c) shouldBe Some(user.id.repr)
+          root.body.string.getOption(c) shouldBe Some(body)
+          root.time.string.getOption(c) shouldBe a [Some[_]]
       }
     }
   }
